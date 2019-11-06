@@ -1,0 +1,62 @@
+variables:
+- group: pypi-info
+
+trigger:
+  branches:
+      include:
+          - master
+          - refs/tags/v*
+stages:
+  - stage: Test
+    jobs:
+      - job: Linux
+        pool:
+          vmImage: 'Ubuntu-latest'
+        strategy:
+          matrix:
+              Python27:
+                  containerImage: python:2.7
+              Python35:
+                  containerImage: python:3.5
+              Python36:
+                  containerImage: python:3.6
+              Python37:
+                  containerImage: python:3.7
+              Python38:
+                  containerImage: python:3.8
+        container: $[ variables['containerImage']]
+
+        steps:
+        - script: |
+            python -m pip install --upgrade pip setuptools tox --user
+          displayName: 'Install dependencies'
+
+        - script: |
+            python -m tox -epy
+          displayName: 'Tox'
+          env: { NEW_RELIC_INSERT_KEY: NOT_A_SECRET }
+
+        - script: |
+            python -m tox -elint
+          displayName: 'Lint'
+          condition: and(succeeded(), endswith(variables['containerImage'], ':3.8'))
+
+  - ${{ if startsWith(variables['Build.SourceBranch'], 'refs/tags/') }}:
+    - stage: Deploy
+      dependsOn: [Test]
+      condition: succeeded()
+      jobs:
+      - job: pypi
+        pool:
+          vmImage: 'Ubuntu-latest'
+        container: python:3.8
+        steps:
+        - script: |
+            python setup.py sdist bdist_wheel
+            python -m pip install --user --upgrade twine
+            python -m twine upload dist/*
+          env:
+            TWINE_USERNAME: $(TWINE_USERNAME)
+            TWINE_PASSWORD: $(TWINE_PASSWORD)
+            TWINE_REPOSITORY_URL: $(TWINE_REPOSITORY_URL)
+          displayName: 'Push to Python Package Index'
