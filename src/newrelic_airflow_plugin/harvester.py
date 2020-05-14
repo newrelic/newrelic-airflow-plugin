@@ -6,6 +6,19 @@ import queue
 _logger = logging.getLogger(__name__)
 
 
+class DummyHarvester(object):
+    def record(self, item):
+        pass
+
+
+class DirectHarvester(object):
+    def __init__(self, client):
+        self._client = client
+
+    def record(self, item):
+        self._client.send(item)
+
+
 class Harvester(threading.Thread):
     """Report data to New Relic at a fixed interval
 

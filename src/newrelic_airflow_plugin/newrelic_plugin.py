@@ -1,5 +1,5 @@
 from airflow.plugins_manager import AirflowPlugin
-from newrelic_airflow_plugin.harvester import Harvester
+from newrelic_airflow_plugin.harvester import Harvester, DummyHarvester, DirectHarvester
 from newrelic_airflow_plugin.metric_batch import MetricBatch
 from newrelic_telemetry_sdk import CountMetric, GaugeMetric, MetricClient
 import os
@@ -57,6 +57,7 @@ def send_batch(client, batch):
 
 class NewRelicStatsLogger(object):
     _recorders = {}
+    _pids = set()
 
     @staticmethod
     def use_harvester():
@@ -87,11 +88,35 @@ class NewRelicStatsLogger(object):
         client = MetricClient(insert_key)
         batch = MetricBatch({"service.name": service_name})
         use_harvester = cls.use_harvester()
+        # If record was called from a forked process the pid will not match the
+        # pid from when the plugin was initialized.
+        prefork = pid in cls._pids
+
         _logger.info(
-            "PID: %d -- Using New Relic Stats Recorder -- use_harvester: %r",
+            "PID: %d -- Using New Relic Stats Recorder -- use_harvester: %r -- prefork: %r",
             os.getpid(),
             use_harvester,
+            prefork,
         )
+
+        if not prefork:
+            if use_harvester:
+                # If we are in a forked process and use_harvester returns true
+                # we should not record the metrics, this means we are in a
+                # forked process that is not a taskrun
+                _logger.info("Using dummy harvester")
+                recorder = DummyHarvester()
+                cls._recorders[pid] = recorder
+                return recorder
+            else:
+                # If we are in a forked process we need to send metrics as soon as
+                # we see them since atexit hooks will not run
+                _logger.info("Using direct harvester")
+                recorder = DirectHarvester(client)
+                cls._recorders[pid] = recorder
+                return recorder
+
+        batch = MetricBatch({"service.name": service_name})
 
         if use_harvester:
             _logger.info("Starting harvester")
@@ -153,6 +178,7 @@ class NewRelicStatsPlugin(AirflowPlugin):
                 pass
 
         if "NEW_RELIC_INSERT_KEY" in os.environ:
+            NewRelicStatsLogger._pids.add(os.getpid())
             _logger.info("Using NewRelicStatsLogger")
             if Stats is DummyStatsLogger:
                 for attr in (
