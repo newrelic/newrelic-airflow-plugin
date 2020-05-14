@@ -7,7 +7,15 @@ import os
 import logging
 import atexit
 
+log_format = "%(asctime)s - %(processName)s : %(process)d - %(threadName)s : %(thread)d -- %(message)s"
+airflow_home = os.getenv("AIRFLOW_HOME")
+log_filename = "airflow-stats.log".format(os.getpid())
+logfile = os.path.join(airflow_home, log_filename)
+log_formatter = logging.Formatter(log_format)
+file_handler = logging.FileHandler(logfile, mode="a")
+file_handler.setFormatter(log_formatter)
 _logger = logging.getLogger(__name__)
+_logger.addHandler(file_handler)
 
 try:
     # sys._getframe is not part of the python spec and is not guaranteed to
@@ -29,12 +37,15 @@ except AttributeError:
 
 
 def join_harvester(harvester):
+    _logger.info("Joining harvester")
     harvester.stop()
     harvester.join()
+    _logger.info("Final harvest complete")
 
 
 def send_batch(client, batch):
     try:
+        _logger.info("Sending final batch")
         response = client.send_batch(*batch.flush())
         if not response.ok:
             _logger.error(
@@ -69,6 +80,7 @@ class NewRelicStatsLogger(object):
         recorder = cls._recorders.get(pid, None)
         if recorder:
             return recorder
+        _logger.info("Creating new recorder")
 
         service_name = os.environ.get("NEW_RELIC_SERVICE_NAME", "Airflow")
         insert_key = os.environ["NEW_RELIC_INSERT_KEY"]
@@ -82,10 +94,12 @@ class NewRelicStatsLogger(object):
         )
 
         if use_harvester:
+            _logger.info("Starting harvester")
             recorder = Harvester(client, batch)
             recorder.start()
             atexit.register(join_harvester, recorder)
         else:
+            _logger.info("Not starting harvester")
             recorder = batch
             atexit.register(send_batch, client, batch)
 
@@ -94,6 +108,7 @@ class NewRelicStatsLogger(object):
 
     @classmethod
     def incr(cls, stat, count=1, rate=1):
+        _logger.info("incr {}".format(stat))
         metric = CountMetric.from_value(stat, count)
         cls.recorder().record(metric)
 
@@ -103,12 +118,14 @@ class NewRelicStatsLogger(object):
 
     @classmethod
     def gauge(cls, stat, value, rate=1, delta=False):
+        _logger.info("gauge {}".format(stat))
         metric = GaugeMetric.from_value(stat, value)
         cls.recorder().record(metric)
 
     @classmethod
     def timing(cls, stat, dt):
         try:
+            _logger.info("timing {}".format(stat))
             metric = GaugeMetric.from_value(
                 stat, dt.microseconds, tags={"units": "microseconds"}
             )
