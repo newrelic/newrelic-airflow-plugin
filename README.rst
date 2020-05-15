@@ -1,3 +1,8 @@
+|header|
+
+.. |header| image:: https://github.com/newrelic/open-source-office/raw/master/examples/categories/images/Experimental.png
+    :target: https://github.com/newrelic/open-source-office/blob/master/examples/categories/index.md#category-new-relic-experimental
+
 New Relic Airflow Metric Exporter
 =================================
 
