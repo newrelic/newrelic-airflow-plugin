@@ -25,6 +25,7 @@ import re
 _logger = logging.getLogger(__name__)
 
 TI_COMPLETE_RE = re.compile(r"ti_(successes|failures)")
+DAG_COMPLETE_RE = re.compile(r"dagrun.duration.(success|failure)")
 
 try:
     # sys._getframe is not part of the python spec and is not guaranteed to
@@ -140,7 +141,13 @@ class NewRelicStatsLogger(object):
             )
         except AttributeError:
             metric = GaugeMetric.from_value(stat, float(dt))
-        cls.recorder().record(metric)
+        recorder = cls.recorder()
+        recorder.record(metric)
+        # If the metric matches ti_successes or ti_failures we know the task
+        # instance completed and we want to send metrics before the process
+        # exits.
+        if DAG_COMPLETE_RE.match(stat):
+            send_batch(recorder)
 
 
 class NewRelicStatsPlugin(AirflowPlugin):
