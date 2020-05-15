@@ -13,7 +13,6 @@
 # limitations under the License.
 
 from airflow.plugins_manager import AirflowPlugin
-from newrelic_airflow_plugin.harvester import Harvester
 from newrelic_airflow_plugin.metric_batch import MetricBatch
 from newrelic_telemetry_sdk import CountMetric, GaugeMetric, MetricClient
 import os
@@ -26,29 +25,6 @@ _logger = logging.getLogger(__name__)
 
 TI_COMPLETE_RE = re.compile(r"ti_(successes|failures)")
 DAG_COMPLETE_RE = re.compile(r"dagrun.duration.(success|failure)")
-
-try:
-    # sys._getframe is not part of the python spec and is not guaranteed to
-    # exist in all python implemenations. However, it does exists in the
-    # reference implemenations of cpython 2, 3 and in pypy.
-    # It is about 3 orders of magnitude faster than inspect in python 2.7
-    # on my laptop. Inspect touches the disk to get filenames and possibly
-    # other information which we don't need.
-    import sys
-
-    get_frame = sys._getframe
-except AttributeError:
-    import inspect
-
-    def getframe(depth):
-        return inspect.stack(0)[depth]
-
-    get_frame = getframe
-
-
-def join_harvester(harvester):
-    harvester.stop()
-    harvester.join()
 
 
 def send_batch(batch):
@@ -65,63 +41,34 @@ def send_batch(batch):
 
 
 class NewRelicStatsLogger(object):
-    _recorders = {}
-
-    @staticmethod
-    def use_harvester():
-        frame = get_frame(2)
-        while frame:
-            if "/airflow/" in frame.f_code.co_filename:
-                if frame.f_code.co_name == "_run_raw_task":
-                    return False
-                elif (
-                    frame.f_code.co_filename.endswith("/bin/cli.py")
-                    and frame.f_code.co_name == "run"
-                ):
-                    return False
-            frame = frame.f_back
-
-        return True
+    _batches = {}
 
     @classmethod
-    def recorder(cls):
+    def batch(cls):
         pid = os.getpid()
-        recorder = cls._recorders.get(pid, None)
-        if recorder:
-            return recorder
+        batch = cls._batches.get(pid, None)
+        if batch:
+            return batch
 
         service_name = os.environ.get("NEW_RELIC_SERVICE_NAME", "Airflow")
         batch = MetricBatch({"service.name": service_name})
-        use_harvester = cls.use_harvester()
-        _logger.info(
-            "PID: %d -- Using New Relic Stats Recorder -- use_harvester: %r",
-            os.getpid(),
-            use_harvester,
-        )
+        _logger.info("PID: %d -- Using New Relic Stats Recorder", os.getpid())
 
-        if use_harvester:
-            insert_key = os.environ["NEW_RELIC_INSERT_KEY"]
-            client = MetricClient(insert_key)
-            recorder = Harvester(client, batch)
-            recorder.start()
-            atexit.register(join_harvester, recorder)
-        else:
-            recorder = batch
-            atexit.register(send_batch, batch)
+        atexit.register(send_batch, batch)
 
-        cls._recorders[pid] = recorder
-        return recorder
+        cls._batches[pid] = batch
+        return batch
 
     @classmethod
     def incr(cls, stat, count=1, rate=1):
         metric = CountMetric.from_value(stat, count)
-        recorder = cls.recorder()
-        recorder.record(metric)
+        batch = cls.batch()
+        batch.record(metric)
         # If the metric matches ti_successes or ti_failures we know the task
         # instance completed and we want to send metrics before the process
         # exits.
         if TI_COMPLETE_RE.match(stat):
-            send_batch(recorder)
+            send_batch(batch)
 
     @classmethod
     def decr(cls, stat, count=1, rate=1):
@@ -130,8 +77,8 @@ class NewRelicStatsLogger(object):
     @classmethod
     def gauge(cls, stat, value, rate=1, delta=False):
         metric = GaugeMetric.from_value(stat, value)
-        recorder = cls.recorder()
-        recorder.record(metric)
+        batch = cls.batch()
+        batch.record(metric)
 
     @classmethod
     def timing(cls, stat, dt):
@@ -141,13 +88,13 @@ class NewRelicStatsLogger(object):
             )
         except AttributeError:
             metric = GaugeMetric.from_value(stat, float(dt))
-        recorder = cls.recorder()
-        recorder.record(metric)
+        batch = cls.batch()
+        batch.record(metric)
         # If the metric matches ti_successes or ti_failures we know the task
         # instance completed and we want to send metrics before the process
         # exits.
         if DAG_COMPLETE_RE.match(stat):
-            send_batch(recorder)
+            send_batch(batch)
 
 
 class NewRelicStatsPlugin(AirflowPlugin):
@@ -171,14 +118,7 @@ class NewRelicStatsPlugin(AirflowPlugin):
         if "NEW_RELIC_INSERT_KEY" in os.environ:
             _logger.info("Using NewRelicStatsLogger")
             if Stats is DummyStatsLogger:
-                for attr in (
-                    "_recorders",
-                    "use_harvester",
-                    "recorder",
-                    "incr",
-                    "gauge",
-                    "timing",
-                ):
+                for attr in ("_batches", "batch", "incr", "gauge", "timing"):
                     setattr(Stats, attr, getattr(NewRelicStatsLogger, attr))
 
         return result
