@@ -22,8 +22,6 @@ stages:
                   containerImage: python:3.6
               Python37:
                   containerImage: python:3.7
-              Python38:
-                  containerImage: python:3.8
         container: $[ variables['containerImage']]
 
         steps:
@@ -39,7 +37,7 @@ stages:
         - script: |
             python -m tox -elint
           displayName: 'Lint'
-          condition: and(succeeded(), endswith(variables['containerImage'], ':3.8'))
+          condition: and(succeeded(), endswith(variables['containerImage'], ':3.7'))
 
   - ${{ if startsWith(variables['Build.SourceBranch'], 'refs/tags/') }}:
     - stage: Deploy
