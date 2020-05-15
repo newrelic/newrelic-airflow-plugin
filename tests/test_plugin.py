@@ -21,11 +21,11 @@ import os
 def stats():
     from airflow.settings import Stats
 
-    assert hasattr(Stats, "recorder")
+    assert hasattr(Stats, "batch")
     pid = os.getpid()
-    assert pid not in Stats._recorders
+    assert pid not in Stats._batches
     yield Stats
-    assert pid in Stats._recorders
+    assert pid in Stats._batches
 
 
 def test_incr(stats):
