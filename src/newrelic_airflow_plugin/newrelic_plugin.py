@@ -20,8 +20,11 @@ import os
 
 import logging
 import atexit
+import re
 
 _logger = logging.getLogger(__name__)
+
+TI_COMPLETE_RE = re.compile(r"ti_(successes|failures)")
 
 try:
     # sys._getframe is not part of the python spec and is not guaranteed to
@@ -47,8 +50,10 @@ def join_harvester(harvester):
     harvester.join()
 
 
-def send_batch(client, batch):
+def send_batch(batch):
     try:
+        insert_key = os.environ["NEW_RELIC_INSERT_KEY"]
+        client = MetricClient(insert_key)
         response = client.send_batch(*batch.flush())
         if not response.ok:
             _logger.error(
@@ -85,8 +90,6 @@ class NewRelicStatsLogger(object):
             return recorder
 
         service_name = os.environ.get("NEW_RELIC_SERVICE_NAME", "Airflow")
-        insert_key = os.environ["NEW_RELIC_INSERT_KEY"]
-        client = MetricClient(insert_key)
         batch = MetricBatch({"service.name": service_name})
         use_harvester = cls.use_harvester()
         _logger.info(
@@ -96,12 +99,14 @@ class NewRelicStatsLogger(object):
         )
 
         if use_harvester:
+            insert_key = os.environ["NEW_RELIC_INSERT_KEY"]
+            client = MetricClient(insert_key)
             recorder = Harvester(client, batch)
             recorder.start()
             atexit.register(join_harvester, recorder)
         else:
             recorder = batch
-            atexit.register(send_batch, client, batch)
+            atexit.register(send_batch, batch)
 
         cls._recorders[pid] = recorder
         return recorder
@@ -109,7 +114,13 @@ class NewRelicStatsLogger(object):
     @classmethod
     def incr(cls, stat, count=1, rate=1):
         metric = CountMetric.from_value(stat, count)
-        cls.recorder().record(metric)
+        recorder = cls.recorder()
+        recorder.record(metric)
+        # If the metric matches ti_successes or ti_failures we know the task
+        # instance completed and we want to send metrics before the process
+        # exits.
+        if TI_COMPLETE_RE.match(stat):
+            send_batch(recorder)
 
     @classmethod
     def decr(cls, stat, count=1, rate=1):
@@ -118,7 +129,8 @@ class NewRelicStatsLogger(object):
     @classmethod
     def gauge(cls, stat, value, rate=1, delta=False):
         metric = GaugeMetric.from_value(stat, value)
-        cls.recorder().record(metric)
+        recorder = cls.recorder()
+        recorder.record(metric)
 
     @classmethod
     def timing(cls, stat, dt):
