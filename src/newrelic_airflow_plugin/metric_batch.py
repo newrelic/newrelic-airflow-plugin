@@ -105,3 +105,6 @@ class MetricBatch(object):
         batch = self._batch
         self._batch = {}
         return tuple(batch.values()), common
+
+    def __len__(self):
+        return len(self._batch)

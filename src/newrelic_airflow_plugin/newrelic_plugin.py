@@ -43,6 +43,8 @@ def send_batch(batch):
 class NewRelicStatsLogger(object):
     _batches = {}
 
+    SEND_THRESHOLD = 100
+
     @classmethod
     def batch(cls):
         pid = os.getpid()
@@ -60,15 +62,21 @@ class NewRelicStatsLogger(object):
         return batch
 
     @classmethod
+    def record_metric(cls, metric, send_metrics=False):
+        batch = cls.batch()
+        batch.record_metric(metric)
+        if send_metrics or len(batch) > cls.SEND_THRESHOLD:
+            send_batch(batch)
+
+    @classmethod
     def incr(cls, stat, count=1, rate=1):
         metric = CountMetric.from_value(stat, count)
-        batch = cls.batch()
-        batch.record(metric)
-        # If the metric matches ti_successes or ti_failures we know the task
-        # instance completed and we want to send metrics before the process
-        # exits.
+        # On receiving the following metrics the batch will be flushed and
+        # sent, `ti_successes, ti_failures`
         if TI_COMPLETE_RE.match(stat):
-            send_batch(batch)
+            cls.record_metric(metric, send_metrics=True)
+        else:
+            cls.record_metric(metric)
 
     @classmethod
     def decr(cls, stat, count=1, rate=1):
@@ -77,8 +85,7 @@ class NewRelicStatsLogger(object):
     @classmethod
     def gauge(cls, stat, value, rate=1, delta=False):
         metric = GaugeMetric.from_value(stat, value)
-        batch = cls.batch()
-        batch.record(metric)
+        cls.record_metric(metric)
 
     @classmethod
     def timing(cls, stat, dt):
@@ -88,13 +95,12 @@ class NewRelicStatsLogger(object):
             )
         except AttributeError:
             metric = GaugeMetric.from_value(stat, float(dt))
-        batch = cls.batch()
-        batch.record(metric)
-        # If the metric matches ti_successes or ti_failures we know the task
-        # instance completed and we want to send metrics before the process
-        # exits.
+        # On receiving the following metrics the batch will be flushed and
+        # sent, `dagrun.duration.failure, dagrun.duration.success`
         if DAG_COMPLETE_RE.match(stat):
-            send_batch(batch)
+            cls.record_metric(metric, send_metrics=True)
+        else:
+            cls.record_metric(metric)
 
 
 class NewRelicStatsPlugin(AirflowPlugin):
