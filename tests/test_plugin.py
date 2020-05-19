@@ -68,25 +68,6 @@ def test_on_dagrun_failure(stats, capture_sent):
     assert len(capture_sent) == 4
 
 
-def test_send_on_threshold(monkeypatch, stats, capture_sent):
-    from newrelic_airflow_plugin.newrelic_plugin import NewRelicStatsLogger
-
-    # monkeypatch to send after 5 metrics are recorded
-    monkeypatch.setattr(NewRelicStatsLogger, "SEND_THRESHOLD", 5)
-
-    stats.incr("test.incr.a")
-    stats.incr("test.incr.b")
-    stats.gauge("test.gauge.a", 12)
-    stats.gauge("test.gauge.b", 12)
-    stats.timing("test.timing", 1.32)
-    # No metrics should have been sent yet
-    assert len(capture_sent) == 0
-    # Record one more metric to pass the threshold
-    stats.timing("dagrun.duration.dag", 0.5)
-    # All six metrics should be sent
-    assert len(capture_sent) == 6
-
-
 def test_incr(stats):
     stats.incr("test_metric")
 

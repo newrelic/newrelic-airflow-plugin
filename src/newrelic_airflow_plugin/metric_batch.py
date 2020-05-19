@@ -12,8 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from newrelic_telemetry_sdk import CountMetric, SummaryMetric
 import time
+
+from newrelic_telemetry_sdk import CountMetric, SummaryMetric
 
 
 class MetricBatch(object):
@@ -105,6 +106,3 @@ class MetricBatch(object):
         batch = self._batch
         self._batch = {}
         return tuple(batch.values()), common
-
-    def __len__(self):
-        return len(self._batch)
