@@ -50,7 +50,7 @@ def test_merge_metric(metric_a, metric_b, expected_value):
     assert metric_a.start_time_ms
     assert metric_b.start_time_ms
 
-    assert len(batch._batch) == 1
+    assert len(batch) == 1
     _, metric = batch._batch.popitem()
 
     assert metric.name == "name"
