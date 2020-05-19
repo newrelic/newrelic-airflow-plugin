@@ -64,7 +64,7 @@ class NewRelicStatsLogger(object):
     @classmethod
     def record_metric(cls, metric, send_metrics=False):
         batch = cls.batch()
-        batch.record_metric(metric)
+        batch.record(metric)
         if send_metrics or len(batch) > cls.SEND_THRESHOLD:
             send_batch(batch)
 
