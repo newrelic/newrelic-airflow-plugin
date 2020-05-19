@@ -12,38 +12,53 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from airflow.plugins_manager import AirflowPlugin
-from newrelic_airflow_plugin.metric_batch import MetricBatch
-from newrelic_telemetry_sdk import CountMetric, GaugeMetric, MetricClient
+import atexit
+import logging
 import os
 
-import logging
-import atexit
-import re
+from airflow.plugins_manager import AirflowPlugin
+from newrelic_airflow_plugin.metric_batch import MetricBatch as _MetricBatch
+from newrelic_telemetry_sdk import CountMetric, GaugeMetric, MetricClient
 
 _logger = logging.getLogger(__name__)
 
-TI_COMPLETE_RE = re.compile(r"ti_(successes|failures)")
-DAG_COMPLETE_RE = re.compile(r"dagrun.duration.(success|failure)")
 
+class MetricBatch(_MetricBatch):
+    IMMEDIATE_FLUSH_PREFIXES = ("ti_", "dagrun.duration.")
 
-def send_batch(batch):
-    try:
+    @property
+    def client(self):
+        if hasattr(self, "_client"):
+            return self._client
+
         insert_key = os.environ["NEW_RELIC_INSERT_KEY"]
-        client = MetricClient(insert_key)
-        response = client.send_batch(*batch.flush())
-        if not response.ok:
-            _logger.error(
-                "New Relic send_batch failed with status code: %r", response.status
-            )
-    except Exception:
-        _logger.exception("New Relic send_batch failed with an exception.")
+        self._client = client = MetricClient(insert_key)
+        return client
+
+    def record(self, metric, *args, **kwargs):
+        result = super(MetricBatch, self).record(metric, *args, **kwargs)
+
+        for prefix in self.IMMEDIATE_FLUSH_PREFIXES:
+            if metric.name.startswith(prefix):
+                self.flush_and_send()
+                break
+
+        return result
+
+    def flush_and_send(self):
+        try:
+            args = super(MetricBatch, self).flush()
+            response = self.client.send_batch(*args)
+            if not response.ok:
+                _logger.error(
+                    "New Relic send_batch failed with status code: %r", response.status
+                )
+        except Exception:
+            _logger.exception("New Relic send_batch failed with an exception.")
 
 
 class NewRelicStatsLogger(object):
     _batches = {}
-
-    SEND_THRESHOLD = 100
 
     @classmethod
     def batch(cls):
@@ -54,29 +69,22 @@ class NewRelicStatsLogger(object):
 
         service_name = os.environ.get("NEW_RELIC_SERVICE_NAME", "Airflow")
         batch = MetricBatch({"service.name": service_name})
-        _logger.info("PID: %d -- Using New Relic Stats Recorder", os.getpid())
+        _logger.info("PID: %d -- Using New Relic Stats Recorder", pid)
 
-        atexit.register(send_batch, batch)
+        atexit.register(batch.flush_and_send)
 
         cls._batches[pid] = batch
         return batch
 
     @classmethod
-    def record_metric(cls, metric, send_metrics=False):
+    def record_metric(cls, metric):
         batch = cls.batch()
         batch.record(metric)
-        if send_metrics or len(batch) > cls.SEND_THRESHOLD:
-            send_batch(batch)
 
     @classmethod
     def incr(cls, stat, count=1, rate=1):
         metric = CountMetric.from_value(stat, count)
-        # On receiving the following metrics the batch will be flushed and
-        # sent, `ti_successes, ti_failures`
-        if TI_COMPLETE_RE.match(stat):
-            cls.record_metric(metric, send_metrics=True)
-        else:
-            cls.record_metric(metric)
+        cls.record_metric(metric)
 
     @classmethod
     def decr(cls, stat, count=1, rate=1):
@@ -95,12 +103,7 @@ class NewRelicStatsLogger(object):
             )
         except AttributeError:
             metric = GaugeMetric.from_value(stat, float(dt))
-        # On receiving the following metrics the batch will be flushed and
-        # sent, `dagrun.duration.failure, dagrun.duration.success`
-        if DAG_COMPLETE_RE.match(stat):
-            cls.record_metric(metric, send_metrics=True)
-        else:
-            cls.record_metric(metric)
+        cls.record_metric(metric)
 
 
 class NewRelicStatsPlugin(AirflowPlugin):
