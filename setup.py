@@ -24,5 +24,8 @@ setuptools.setup(
 version = "{version!s}"
 """,
     },
-    install_requires=("apache-airflow<2, >=1.8", "newrelic-telemetry-sdk~=0.2"),
+    install_requires=(
+        "apache-airflow<2, >=1.8",
+        "newrelic-telemetry-sdk>=0.2.3,<0.4.0",
+    ),
 )
