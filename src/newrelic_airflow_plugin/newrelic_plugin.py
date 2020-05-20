@@ -15,71 +15,65 @@
 import atexit
 import logging
 import os
+import threading
+
+from newrelic_telemetry_sdk import CountMetric, GaugeMetric
+from newrelic_telemetry_sdk import Harvester as _Harvester
+from newrelic_telemetry_sdk import MetricBatch, MetricClient
 
 from airflow.plugins_manager import AirflowPlugin
-from newrelic_airflow_plugin.metric_batch import MetricBatch as _MetricBatch
-from newrelic_telemetry_sdk import CountMetric, GaugeMetric, MetricClient
 
 _logger = logging.getLogger(__name__)
 
 
-class MetricBatch(_MetricBatch):
+class Harvester(_Harvester):
     IMMEDIATE_FLUSH_PREFIXES = ("ti_", "dagrun.duration.")
 
-    @property
-    def client(self):
-        if hasattr(self, "_client"):
-            return self._client
-
-        insert_key = os.environ["NEW_RELIC_INSERT_KEY"]
-        self._client = client = MetricClient(insert_key)
-        return client
-
     def record(self, metric, *args, **kwargs):
-        result = super(MetricBatch, self).record(metric, *args, **kwargs)
+        result = super(Harvester, self).record(metric, *args, **kwargs)
 
         for prefix in self.IMMEDIATE_FLUSH_PREFIXES:
             if metric.name.startswith(prefix):
-                self.flush_and_send()
+                self._send(*self._batch.flush())
                 break
 
         return result
 
-    def flush_and_send(self):
-        try:
-            args = super(MetricBatch, self).flush()
-            response = self.client.send_batch(*args)
-            if not response.ok:
-                _logger.error(
-                    "New Relic send_batch failed with status code: %r", response.status
-                )
-        except Exception:
-            _logger.exception("New Relic send_batch failed with an exception.")
-
 
 class NewRelicStatsLogger(object):
-    _batches = {}
+    _harvesters = {}
+    _lock = threading.RLock()
 
     @classmethod
-    def batch(cls):
+    def harvester(cls):
         pid = os.getpid()
-        batch = cls._batches.get(pid, None)
-        if batch:
-            return batch
+        harvester = cls._harvesters.get(pid, None)
+        if harvester:
+            return harvester
 
-        service_name = os.environ.get("NEW_RELIC_SERVICE_NAME", "Airflow")
-        batch = MetricBatch({"service.name": service_name})
-        _logger.info("PID: %d -- Using New Relic Stats Recorder", pid)
+        with cls._lock:
+            harvester = cls._harvesters.get(pid, None)
+            if harvester:
+                return harvester
 
-        atexit.register(batch.flush_and_send)
+            insert_key = os.environ["NEW_RELIC_INSERT_KEY"]
+            client = MetricClient(insert_key, host="staging-metric-api.newrelic.com")
 
-        cls._batches[pid] = batch
-        return batch
+            service_name = os.environ.get("NEW_RELIC_SERVICE_NAME", "Airflow")
+            batch = MetricBatch({"service.name": service_name})
+            _logger.info("PID: %d -- Using New Relic Stats Recorder", pid)
+
+            harvester = cls._harvesters[pid] = Harvester(client, batch)
+            harvester.start()
+
+            atexit.register(harvester.stop)
+
+            return harvester
 
     @classmethod
     def record_metric(cls, metric):
-        batch = cls.batch()
-        batch.record(metric)
+        harvester = cls.harvester()
+        harvester.record(metric)
 
     @classmethod
     def incr(cls, stat, count=1, rate=1):
@@ -108,6 +102,7 @@ class NewRelicStatsLogger(object):
 
 class NewRelicStatsPlugin(AirflowPlugin):
     name = "NewRelicStatsPlugin"
+    patched = False
 
     @classmethod
     def validate(cls):
@@ -124,10 +119,11 @@ class NewRelicStatsPlugin(AirflowPlugin):
             except ImportError:
                 pass
 
-        if "NEW_RELIC_INSERT_KEY" in os.environ:
+        if "NEW_RELIC_INSERT_KEY" in os.environ and not cls.patched:
+            cls.patched = True
             _logger.info("Using NewRelicStatsLogger")
             if Stats is DummyStatsLogger:
-                for attr in ("_batches", "batch", "incr", "gauge", "timing"):
+                for attr in ("incr", "gauge", "timing"):
                     setattr(Stats, attr, getattr(NewRelicStatsLogger, attr))
 
         return result
