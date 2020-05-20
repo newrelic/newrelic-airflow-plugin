@@ -12,22 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import pytest
 import datetime
 import os
 
-from newrelic_telemetry_sdk.client import MetricClient, HTTPResponse
+import pytest
+from newrelic_telemetry_sdk.client import HTTPResponse, MetricClient
 
 
 @pytest.fixture(scope="module")
 def stats():
     from airflow.settings import Stats
+    from newrelic_airflow_plugin.newrelic_plugin import NewRelicStatsLogger
 
-    assert hasattr(Stats, "batch")
     pid = os.getpid()
-    assert pid not in Stats._batches
+    assert pid not in NewRelicStatsLogger._harvesters
     yield Stats
-    assert pid in Stats._batches
+    assert pid in NewRelicStatsLogger._harvesters
 
 
 @pytest.fixture
