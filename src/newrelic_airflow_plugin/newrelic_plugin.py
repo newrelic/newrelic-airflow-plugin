@@ -17,7 +17,6 @@ import logging
 import os
 import threading
 
-from newrelic_telemetry_sdk import CountMetric, GaugeMetric
 from newrelic_telemetry_sdk import Harvester as _Harvester
 from newrelic_telemetry_sdk import MetricBatch, MetricClient
 
@@ -29,15 +28,18 @@ _logger = logging.getLogger(__name__)
 class Harvester(_Harvester):
     IMMEDIATE_FLUSH_PREFIXES = ("ti_", "dagrun.duration.")
 
-    def record(self, metric, *args, **kwargs):
-        result = super(Harvester, self).record(metric, *args, **kwargs)
-
+    def send_for_metric(self, metric_name):
         for prefix in self.IMMEDIATE_FLUSH_PREFIXES:
-            if metric.name.startswith(prefix):
-                self._send(*self._batch.flush())
-                break
-
-        return result
+            if metric_name.startswith(prefix):
+                try:
+                    response = self.client.send_batch(*self.batch.flush())
+                    if not response.ok:
+                        _logger.error(
+                            "Sending metrics failed with status code: %r",
+                            response.status,
+                        )
+                except Exception:
+                    _logger.exception("Sending metrics failed with an exception.")
 
 
 class NewRelicStatsLogger(object):
@@ -71,14 +73,10 @@ class NewRelicStatsLogger(object):
             return harvester
 
     @classmethod
-    def record_metric(cls, metric):
-        harvester = cls.harvester()
-        harvester.record(metric)
-
-    @classmethod
     def incr(cls, stat, count=1, rate=1):
-        metric = CountMetric.from_value(stat, count)
-        cls.record_metric(metric)
+        harvester = cls.harvester()
+        harvester.batch.record_count(stat, count)
+        harvester.send_for_metric(stat)
 
     @classmethod
     def decr(cls, stat, count=1, rate=1):
@@ -86,18 +84,22 @@ class NewRelicStatsLogger(object):
 
     @classmethod
     def gauge(cls, stat, value, rate=1, delta=False):
-        metric = GaugeMetric.from_value(stat, value)
-        cls.record_metric(metric)
+        harvester = cls.harvester()
+        harvester.batch.record_gauge(stat, value)
+        harvester.send_for_metric(stat)
 
     @classmethod
     def timing(cls, stat, dt):
+        value = None
+        tags = None
         try:
-            metric = GaugeMetric.from_value(
-                stat, dt.microseconds, tags={"units": "microseconds"}
-            )
+            value = dt.microseconds
+            tags = {"units": "microseconds"}
         except AttributeError:
-            metric = GaugeMetric.from_value(stat, float(dt))
-        cls.record_metric(metric)
+            value = float(dt)
+        harvester = cls.harvester()
+        harvester.batch.record_gauge(stat, value, tags=tags)
+        harvester.send_for_metric(stat)
 
 
 class NewRelicStatsPlugin(AirflowPlugin):
