@@ -59,7 +59,7 @@ class NewRelicStatsLogger(object):
                 return harvester
 
             insert_key = os.environ["NEW_RELIC_INSERT_KEY"]
-            service_name = os.environ.get("NEW_RELIC_HOST", "metric-api.newrelic.com")
+            host = os.environ.get("NEW_RELIC_HOST", "metric-api.newrelic.com")
             client = MetricClient(insert_key, host)
 
             service_name = os.environ.get("NEW_RELIC_SERVICE_NAME", "Airflow")
