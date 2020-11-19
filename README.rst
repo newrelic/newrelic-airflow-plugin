@@ -44,6 +44,10 @@ The ``NEW_RELIC_SERVICE_NAME`` environment variable can be set to customize the
 ``service.name`` attribute on all generated metrics. The default value is
 ``Airflow``.
 
+``NEW_RELIC_HOST`` environment variable can be used to set datacenter host.
+For example, to send metrics to EU data center set this variable to ``metric-api.eu.newrelic.com``
+By default metrics will be send to US data center.
+
 
 Airflow Versions >= 1.10
 ++++++++++++++++++++++++
