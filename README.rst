@@ -1,7 +1,7 @@
 |header|
 
-.. |header| image:: https://github.com/newrelic/open-source-office/raw/master/examples/categories/images/Experimental.png
-    :target: https://github.com/newrelic/open-source-office/blob/master/examples/categories/index.md#category-new-relic-experimental
+.. |header| image:: https://github.com/newrelic/opensource-website/raw/master/src/images/categories/Community_Plus.png
+    :target: https://opensource.newrelic.com/oss-category/#community-plus
 
 New Relic Airflow Metric Exporter
 =================================
