@@ -21,7 +21,7 @@ A plugin for `Apache Airflow <https://airflow.apache.org/>`_ to send
 Requirements
 ------------
 
-Airflow versions >= 1.10 are preferred for ease of use; however, versions >= 1.8 should work.
+Only supports Airflow versions >= 2.0.
 
 Using the plugin
 ----------------
@@ -49,14 +49,7 @@ For example, to send metrics to EU data center set this variable to ``metric-api
 By default metrics will be send to US data center.
 
 
-Airflow Versions >= 1.10
+Airflow Versions >= 2.0
 ++++++++++++++++++++++++
 
 ✨ That's it! ✨
-
-Airflow Versions < 1.10
-+++++++++++++++++++++++
-
-The `newrelic_plugin.py <src/newrelic_airflow_plugin/newrelic_plugin.py>`_
-file must be copied into the configured ``plugins_folder`` directory. This
-defaults to ``{AIRFLOW_HOME}/plugins``.
