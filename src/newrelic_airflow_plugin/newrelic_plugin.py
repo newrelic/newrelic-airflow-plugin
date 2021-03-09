@@ -125,8 +125,8 @@ class NewRelicStatsPlugin(AirflowPlugin):
         if "NEW_RELIC_INSERT_KEY" in os.environ and not cls.patched:
             cls.patched = True
             _logger.info("Using NewRelicStatsLogger")
-            if Stats is DummyStatsLogger:
+            if isinstance(Stats.instance, DummyStatsLogger):
                 for attr in ("incr", "gauge", "timing"):
-                    setattr(Stats, attr, getattr(NewRelicStatsLogger, attr))
+                    setattr(Stats.instance, attr, getattr(NewRelicStatsLogger, attr))
 
         return result
