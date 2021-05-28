@@ -22,11 +22,10 @@ from newrelic_telemetry_sdk.client import HTTPResponse, MetricClient
 @pytest.fixture(scope="module")
 def stats():
     try:
-        from airflow.stats import Stats, DummyStatsLogger
+        from airflow.stats import Stats
     except ImportError:
-
         try:
-            from airflow.settings import Stats, DummyStatsLogger
+            from airflow.settings import Stats
         except ImportError:
             pass
 
