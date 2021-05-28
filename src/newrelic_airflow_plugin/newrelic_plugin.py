@@ -106,6 +106,7 @@ class NewRelicStatsLogger(object):
 class NewRelicStatsPlugin(AirflowPlugin):
     name = "NewRelicStatsPlugin"
     patched = False
+    patched_attrs = ("incr", "gauge", "timing")
 
     @classmethod
     def validate(cls):
@@ -125,8 +126,15 @@ class NewRelicStatsPlugin(AirflowPlugin):
         if "NEW_RELIC_INSERT_KEY" in os.environ and not cls.patched:
             cls.patched = True
             _logger.info("Using NewRelicStatsLogger")
-            if isinstance(Stats.instance, DummyStatsLogger):
-                for attr in ("incr", "gauge", "timing"):
+
+            # Patch class
+            if Stats is DummyStatsLogger:
+                for attr in cls.patched_attrs:
+                    setattr(Stats, attr, getattr(NewRelicStatsLogger, attr))
+
+            # Patch instance
+            if hasattr(Stats, "instance") and isinstance(Stats.instance, DummyStatsLogger):
+                for attr in cls.patched_attrs:
                     setattr(Stats.instance, attr, getattr(NewRelicStatsLogger, attr))
 
         return result
