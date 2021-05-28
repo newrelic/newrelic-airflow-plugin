@@ -17,10 +17,9 @@ import logging
 import os
 import threading
 
+from airflow.plugins_manager import AirflowPlugin
 from newrelic_telemetry_sdk import Harvester as _Harvester
 from newrelic_telemetry_sdk import MetricBatch, MetricClient
-
-from airflow.plugins_manager import AirflowPlugin
 
 _logger = logging.getLogger(__name__)
 
@@ -115,11 +114,10 @@ class NewRelicStatsPlugin(AirflowPlugin):
         DummyStatsLogger = Stats = None
 
         try:
-            from airflow.stats import Stats, DummyStatsLogger
+            from airflow.stats import DummyStatsLogger, Stats
         except ImportError:
-
             try:
-                from airflow.settings import Stats, DummyStatsLogger
+                from airflow.settings import DummyStatsLogger, Stats
             except ImportError:
                 pass
 
