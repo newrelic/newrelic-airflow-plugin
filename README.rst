@@ -52,4 +52,27 @@ By default metrics will be send to US data center.
 Airflow Versions >= 2.0
 ++++++++++++++++++++++++
 
+Disable Airflow's lazy plugin loading. This is required for the plugin to properly patch Airflow's Stats engine.
+
+This can be done via environment variable:
+
+`AIRFLOW__CORE__LAZY_LOAD_PLUGINS=False`
+
+Or can be set in your config file (`airflow.cfg`):
+
+```
+[core]
+lazy_load_plugins = False
+```
+
+Airflow Versions >= 1.10,<2.0
+++++++++++++++++++++++++
+
 ✨ That's it! ✨
+
+Airflow Versions < 1.10
++++++++++++++++++++++++
+
+The `newrelic_plugin.py <src/newrelic_airflow_plugin/newrelic_plugin.py>`_
+file must be copied into the configured ``plugins_folder`` directory. This
+defaults to ``{AIRFLOW_HOME}/plugins``.
