@@ -67,7 +67,7 @@ Or can be set in your config file (``airflow.cfg``):
 
 
 Airflow Versions >= 1.10,<2.0
-++++++++++++++++++++++++
+++++++++++++++++++++++++++++++
 
 ✨ That's it! ✨
 
