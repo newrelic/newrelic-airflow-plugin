@@ -131,7 +131,9 @@ class NewRelicStatsPlugin(AirflowPlugin):
                     setattr(Stats, attr, getattr(NewRelicStatsLogger, attr))
 
             # Patch instance
-            if hasattr(Stats, "instance") and isinstance(Stats.instance, DummyStatsLogger):
+            if hasattr(Stats, "instance") and isinstance(
+                Stats.instance, DummyStatsLogger
+            ):
                 for attr in cls.patched_attrs:
                     setattr(Stats.instance, attr, getattr(NewRelicStatsLogger, attr))
 
