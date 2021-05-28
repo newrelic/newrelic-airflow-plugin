@@ -56,14 +56,15 @@ Disable Airflow's lazy plugin loading. This is required for the plugin to proper
 
 This can be done via environment variable:
 
-`AIRFLOW__CORE__LAZY_LOAD_PLUGINS=False`
+``AIRFLOW__CORE__LAZY_LOAD_PLUGINS=False``
 
-Or can be set in your config file (`airflow.cfg`):
+Or can be set in your config file (``airflow.cfg``):
 
-```
-[core]
-lazy_load_plugins = False
-```
+.. code-block::
+
+    [core]
+    lazy_load_plugins = False
+
 
 Airflow Versions >= 1.10,<2.0
 ++++++++++++++++++++++++
