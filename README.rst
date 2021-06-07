@@ -21,7 +21,7 @@ A plugin for `Apache Airflow <https://airflow.apache.org/>`_ to send
 Requirements
 ------------
 
-Only supports Airflow versions >= 2.0.
+Airflow versions >= 1.10 are preferred for ease of use; however, versions >= 1.8 should work.
 
 Using the plugin
 ----------------
