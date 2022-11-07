@@ -123,3 +123,8 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# docker volumes
+docker/dags
+docker/logs
+docker/plugins

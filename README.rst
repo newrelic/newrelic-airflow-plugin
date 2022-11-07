@@ -35,7 +35,43 @@ via pip:
 
 
 Configuration
-+++++++++++++
+----------------
+
+The integration can either be configured via configuration file (`airflow.cfg`) or via environment variables.
+
+Via configuration file
+++++++++++++++++++++++++
+
+Per default the integration will look for a configuration file called ``airflow.cfg`` in the ``/opt/airflow`` directory. 
+
+The directory can be changed via the ``AIRFLOW_HOME`` environment variable.
+
+The integration is configured within the ``[newrelic]`` section (see [docker example](./docker/airflow.cfg)).
+
+
+Following properties are supported:
+```
+[newrelic]
+
+insert_key = abc-your-ingest-key-here   # Insert API Key
+host = metric-api.eu.newrelic.com       # Datacenter host (defaults to US region)
+service_name = local-airflow-docker     # Custom service name, under which the data will be reported (defaults to Airflow)
+harvester_interval = 10                 # Harvester interval (defaults to 5)
+
+# Additional dimensions to pass
+nr_dim_foo = bar
+nr_dim_baz = lol
+nr_dim_some = thing
+```
+
+
+Additional dimensions can be added only in the configuration file.
+
+They need to start with the `nr_dim_` prefix, which will be cut away when sending to New Relic.
+
+
+Via Environment
+++++++++++++++++++++++++
 
 Set the ``NEW_RELIC_INSERT_KEY`` environment variable to a valid
 `New Relic insert key <https://docs.newrelic.com/docs/apis/get-started/intro-apis/types-new-relic-api-keys#event-insert-key>`_
@@ -77,3 +113,13 @@ Airflow Versions < 1.10
 The `newrelic_plugin.py <src/newrelic_airflow_plugin/newrelic_plugin.py>`_
 file must be copied into the configured ``plugins_folder`` directory. This
 defaults to ``{AIRFLOW_HOME}/plugins``.
+
+Local development
+----------------
+
+The integration can be easily run via docker and mounts the newrelic_plugin.py automatically.
+
+```
+cd docker
+NEW_RELIC_INSERT_KEY=insert-key docker-compose up -d
+```
