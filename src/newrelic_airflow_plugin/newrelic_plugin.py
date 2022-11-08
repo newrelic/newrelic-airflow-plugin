@@ -44,7 +44,9 @@ def get_config():
         airflow_config = file.read()
         file.close()
         airflow_config = AirflowConfigParser(default_config=airflow_config)
-        nr_config = airflow_config.getsection("newrelic")
+        section = airflow_config.getsection("newrelic")
+        if section != None:
+            nr_config = section
     else:
       _logger.info("Could not find airflow configt at ", config_location)
     
