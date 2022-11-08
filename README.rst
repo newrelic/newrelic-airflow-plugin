@@ -113,13 +113,3 @@ Airflow Versions < 1.10
 The `newrelic_plugin.py <src/newrelic_airflow_plugin/newrelic_plugin.py>`_
 file must be copied into the configured ``plugins_folder`` directory. This
 defaults to ``{AIRFLOW_HOME}/plugins``.
-
-Local development
-----------------
-
-The integration can be easily run via docker and mounts the newrelic_plugin.py automatically.
-
-```
-cd docker
-NEW_RELIC_INSERT_KEY=insert-key docker-compose up -d
-```
