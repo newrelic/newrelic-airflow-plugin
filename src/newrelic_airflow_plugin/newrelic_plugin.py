@@ -32,48 +32,52 @@ PROP_INSERT_KEY = "insert_key"
 PROP_HARVESTER_INTERVAL = "harvester_interval"
 
 DIM_PREFIX = "nr_dim_"
-    
+
 _logger = logging.getLogger(__name__)
+
 
 def get_config():
     config_location = os.environ.get("AIRFLOW_HOME", "/opt/airflow") + "/airflow.cfg"
-    
+
     nr_config = {}
     if os.path.isfile(config_location) and os.access(config_location, os.R_OK):
-        file = open(config_location, mode='r')
+        file = open(config_location, mode="r")
         airflow_config = file.read()
         file.close()
         airflow_config = AirflowConfigParser(default_config=airflow_config)
         section = airflow_config.getsection("newrelic")
-        if section != None:
+        if section is not None:
             nr_config = section
     else:
-      _logger.info("Could not find airflow configt at ", config_location)
-    
+        _logger.info("Could not find airflow configt at ", config_location)
+
     # Set default configs
-    if not PROP_INSERT_KEY in nr_config and ENV_INSERT_KEY in os.environ:
+    if PROP_INSERT_KEY not in nr_config and ENV_INSERT_KEY in os.environ:
         nr_config[PROP_INSERT_KEY] = os.environ.get(ENV_INSERT_KEY)
 
-    if not PROP_SERVICE_NAME in nr_config:
+    if PROP_SERVICE_NAME not in nr_config:
         nr_config[PROP_SERVICE_NAME] = os.environ.get(ENV_SERVICE_NAME, "Airflow")
-        
-    if not PROP_HOST in nr_config:
+
+    if PROP_HOST not in nr_config:
         nr_config[PROP_HOST] = os.environ.get(ENV_HOST, None)
-        
-    if not PROP_HARVESTER_INTERVAL in nr_config:
+
+    if PROP_HARVESTER_INTERVAL not in nr_config:
         nr_config[PROP_HARVESTER_INTERVAL] = 5
-        
+
     return nr_config
 
+
 def get_dimensions(config):
-        dims = {"service.name": config[PROP_SERVICE_NAME]}
-        for key, value in config.items():
-            if key.startswith(DIM_PREFIX):
-                dims[key[len(DIM_PREFIX):]] = value
-        
-        return dims
+    dims = {"service.name": config[PROP_SERVICE_NAME]}
+    for key, value in config.items():
+        if key.startswith(DIM_PREFIX):
+            dims[key[len(DIM_PREFIX) :]] = value
+
+    return dims
+
 
 config = get_config()
+
 
 class Harvester(_Harvester):
     IMMEDIATE_FLUSH_PREFIXES = ("ti_", "dagrun.duration.")
@@ -95,7 +99,7 @@ class Harvester(_Harvester):
 class NewRelicStatsLogger(object):
     _harvesters = {}
     _lock = threading.RLock()
-    
+
     @classmethod
     def harvester(cls):
         pid = os.getpid()
@@ -107,13 +111,15 @@ class NewRelicStatsLogger(object):
             harvester = cls._harvesters.get(pid, None)
             if harvester:
                 return harvester
-            
+
             client = MetricClient(config[PROP_INSERT_KEY], host=config[PROP_HOST])
 
             batch = MetricBatch(get_dimensions(config))
             _logger.info("PID: %d -- Using New Relic Stats Recorder", pid)
 
-            harvester = cls._harvesters[pid] = Harvester(client, batch, harvest_interval=config[PROP_HARVESTER_INTERVAL])
+            harvester = cls._harvesters[pid] = Harvester(
+                client, batch, harvest_interval=config[PROP_HARVESTER_INTERVAL]
+            )
             harvester.start()
 
             atexit.register(harvester.stop)
@@ -171,7 +177,7 @@ class NewRelicStatsPlugin(AirflowPlugin):
 
         if PROP_INSERT_KEY in config and not cls.patched:
             cls.patched = True
-            _logger.info("Using NewRelicStatsLogger")        
+            _logger.info("Using NewRelicStatsLogger")
 
             # Patch class
             if Stats is DummyStatsLogger:
