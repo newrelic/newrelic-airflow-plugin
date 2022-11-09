@@ -50,24 +50,25 @@ The integration is configured within the ``[newrelic]`` section (see [docker exa
 
 
 Following properties are supported:
-```
-[newrelic]
 
-insert_key = abc-your-ingest-key-here   # Insert API Key
-host = metric-api.eu.newrelic.com       # Datacenter host (defaults to US region)
-service_name = local-airflow-docker     # Custom service name, under which the data will be reported (defaults to Airflow)
-harvester_interval = 10                 # Harvester interval (defaults to 5)
+..  code-block:: bash
 
-# Additional dimensions to pass
-nr_dim_foo = bar
-nr_dim_baz = lol
-nr_dim_some = thing
-```
+    [newrelic]
+    insert_key = abc-your-ingest-key-here   # Insert API Key
+    host = metric-api.eu.newrelic.com       # Datacenter host (defaults to US region)
+    service_name = local-airflow-docker     # Custom service name, under which the data will be reported (defaults to Airflow)
+    harvester_interval = 10                 # Harvester interval (defaults to 5)
+    
+    # Additional dimensions to pass
+    nr_dim_foo = bar
+    nr_dim_baz = lol
+    nr_dim_some = thing
+
 
 
 Additional dimensions can be added only in the configuration file.
 
-They need to start with the `nr_dim_` prefix, which will be cut away when sending to New Relic.
+They need to start with the ``nr_dim_`` prefix, which will be cut away when sending to New Relic.
 
 
 Via Environment
