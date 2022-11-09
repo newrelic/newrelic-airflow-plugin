@@ -46,9 +46,6 @@ Per default the integration will look for a configuration file called ``airflow.
 
 The directory can be changed via the ``AIRFLOW_HOME`` environment variable.
 
-The integration is configured within the ``[newrelic]`` section (see [docker example](./docker/airflow.cfg)).
-
-
 Following properties are supported:
 
 ..  code-block:: bash
@@ -58,7 +55,7 @@ Following properties are supported:
     host = metric-api.eu.newrelic.com       # Datacenter host (defaults to US region)
     service_name = local-airflow-docker     # Custom service name, under which the data will be reported (defaults to Airflow)
     harvester_interval = 10                 # Harvester interval (defaults to 5)
-    
+
     # Additional dimensions to pass
     nr_dim_foo = bar
     nr_dim_baz = lol
