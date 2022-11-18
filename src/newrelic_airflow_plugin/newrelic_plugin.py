@@ -44,12 +44,14 @@ def get_config():
         file = open(config_location, mode="r")
         airflow_config = file.read()
         file.close()
-        airflow_config = AirflowConfigParser(default_config=airflow_config)
+        airflow_config = AirflowConfigParser(
+            default_config=airflow_config.encode("UTF-8").decode()
+        )
         section = airflow_config.getsection("newrelic")
         if section is not None:
             nr_config = section
     else:
-        _logger.info("Could not find airflow configt at ", config_location)
+        _logger.info("Could not find airflow config at ", config_location)
 
     # Set default configs
     if PROP_INSERT_KEY not in nr_config and ENV_INSERT_KEY in os.environ:
