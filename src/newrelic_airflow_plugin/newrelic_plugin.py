@@ -31,7 +31,7 @@ PROP_SERVICE_NAME = "service_name"
 PROP_INSERT_KEY = "insert_key"
 PROP_HARVESTER_INTERVAL = "harvester_interval"
 
-DIM_PREFIX = "nr_dim_"
+DIM_PREFIX = "dimension_"
 
 _logger = logging.getLogger(__name__)
 
@@ -40,18 +40,21 @@ def get_config():
     config_location = os.environ.get("AIRFLOW_HOME", "/opt/airflow") + "/airflow.cfg"
 
     nr_config = {}
-    if os.path.isfile(config_location) and os.access(config_location, os.R_OK):
-        file = open(config_location, mode="r")
-        airflow_config = file.read()
-        file.close()
+    try:
+        with open(config_location, mode="r") as file:
+            airflow_config = file.read()
+
         airflow_config = AirflowConfigParser(
             default_config=airflow_config.encode("UTF-8").decode()
         )
         section = airflow_config.getsection("newrelic")
         if section is not None:
             nr_config = section
-    else:
-        _logger.info("Could not find airflow config at ", config_location)
+    except Exception:
+        _logger.warning(
+            "Could not find airflow config at %s, using default from environment",
+            config_location,
+        )
 
     # Set default configs
     if PROP_INSERT_KEY not in nr_config and ENV_INSERT_KEY in os.environ:
@@ -70,10 +73,10 @@ def get_config():
 
 
 def get_dimensions(config):
-    dims = {"service.name": config[PROP_SERVICE_NAME]}
-    for key, value in config.items():
-        if key.startswith(DIM_PREFIX):
-            dims[key[len(DIM_PREFIX) :]] = value
+    dims = {
+        k[len(DIM_PREFIX) :]: v for k, v in config.items() if k.startswith(DIM_PREFIX)
+    }
+    dims["service.name"] = config[PROP_SERVICE_NAME]
 
     return dims
 
