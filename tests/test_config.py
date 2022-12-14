@@ -23,7 +23,6 @@ from newrelic_airflow_plugin.newrelic_plugin import (
     PROP_INSERT_KEY,
     PROP_SERVICE_NAME,
     get_config,
-    get_dimensions,
 )
 
 
@@ -31,11 +30,13 @@ def test_env_configuration():
     os.environ[ENV_SERVICE_NAME] = "test-name"
     os.environ[ENV_INSERT_KEY] = "foo-bar-baz"
     os.environ[ENV_HOST] = "metric-api.eu.newrelic.com"
-    config = get_config()
+
+    config, dimensions = get_config()
     assert config[PROP_SERVICE_NAME] == "test-name"
     assert config[PROP_HOST] == "metric-api.eu.newrelic.com"
     assert config[PROP_INSERT_KEY] == "foo-bar-baz"
     assert config[PROP_HARVESTER_INTERVAL] == 5
+    assert dimensions["service.name"] == "test-name"
 
 
 def test_file_configuration():
@@ -48,14 +49,14 @@ def test_file_configuration():
         os.path.dirname(os.path.realpath(__file__)) + "/resources"
     )
 
-    config = get_config()
+    config, dimensions = get_config()
     assert config[PROP_SERVICE_NAME] == "name-from-file"
     assert config[PROP_HOST] == "metric-api.foo.newrelic.com"
     assert config[PROP_INSERT_KEY] == "my-secret-key"
     assert config[PROP_HARVESTER_INTERVAL] == 99
 
-    dims = get_dimensions(config)
-    assert dims["foo"] == "bar"
-    assert dims["some"] == "thing"
+    assert dimensions["foo"] == "bar"
+    assert dimensions["some"] == "thing"
+    assert dimensions["service.name"] == "name-from-file"
 
     os.environ["AIRFLOW_HOME"] = airflow_home

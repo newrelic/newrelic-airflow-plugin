@@ -57,15 +57,14 @@ Following properties are supported:
     harvester_interval = 10                 # Harvester interval (defaults to 5)
 
     # Additional dimensions to pass
-    dimension_foo = bar
-    dimension_baz = lol
-    dimension_some = thing
+    [newrelic.dimensions]
+    foo = bar
+    new = relic
+    some = thing
 
 
 
-Additional dimensions can be added only in the configuration file.
-
-They need to start with the ``dimension_`` prefix, which will be cut away when sending to New Relic.
+Additional dimensions can only be added in the configuration file in the ``[newrelic.dimensions]`` section.
 
 
 Via Environment

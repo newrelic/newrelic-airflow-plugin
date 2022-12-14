@@ -31,8 +31,6 @@ PROP_SERVICE_NAME = "service_name"
 PROP_INSERT_KEY = "insert_key"
 PROP_HARVESTER_INTERVAL = "harvester_interval"
 
-DIM_PREFIX = "dimension_"
-
 _logger = logging.getLogger(__name__)
 
 
@@ -40,6 +38,7 @@ def get_config():
     config_location = os.environ.get("AIRFLOW_HOME", "/opt/airflow") + "/airflow.cfg"
 
     nr_config = {}
+    nr_dimensions = {}
     try:
         with open(config_location, mode="r") as file:
             airflow_config = file.read()
@@ -50,6 +49,11 @@ def get_config():
         section = airflow_config.getsection("newrelic")
         if section is not None:
             nr_config = section
+
+        section = airflow_config.getsection("newrelic.dimensions")
+        if section is not None:
+            nr_dimensions = section
+
     except Exception:
         _logger.warning(
             "Could not find airflow config at %s, using default from environment",
@@ -69,19 +73,12 @@ def get_config():
     if PROP_HARVESTER_INTERVAL not in nr_config:
         nr_config[PROP_HARVESTER_INTERVAL] = 5
 
-    return nr_config
+    nr_dimensions["service.name"] = nr_config[PROP_SERVICE_NAME]
+
+    return nr_config, nr_dimensions
 
 
-def get_dimensions(config):
-    dims = {
-        k[len(DIM_PREFIX) :]: v for k, v in config.items() if k.startswith(DIM_PREFIX)
-    }
-    dims["service.name"] = config[PROP_SERVICE_NAME]
-
-    return dims
-
-
-config = get_config()
+config, dimensions = get_config()
 
 
 class Harvester(_Harvester):
@@ -119,7 +116,7 @@ class NewRelicStatsLogger(object):
 
             client = MetricClient(config[PROP_INSERT_KEY], host=config[PROP_HOST])
 
-            batch = MetricBatch(get_dimensions(config))
+            batch = MetricBatch(dimensions)
             _logger.info("PID: %d -- Using New Relic Stats Recorder", pid)
 
             harvester = cls._harvesters[pid] = Harvester(
