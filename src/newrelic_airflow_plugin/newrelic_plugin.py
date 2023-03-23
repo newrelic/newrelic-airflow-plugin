@@ -18,10 +18,67 @@ import os
 import threading
 
 from airflow.plugins_manager import AirflowPlugin
+from airflow.configuration import AirflowConfigParser
 from newrelic_telemetry_sdk import Harvester as _Harvester
 from newrelic_telemetry_sdk import MetricBatch, MetricClient
 
+ENV_SERVICE_NAME = "NEW_RELIC_SERVICE_NAME"
+ENV_INSERT_KEY = "NEW_RELIC_INSERT_KEY"
+ENV_HOST = "NEW_RELIC_HOST"
+
+PROP_HOST = "host"
+PROP_SERVICE_NAME = "service_name"
+PROP_INSERT_KEY = "insert_key"
+PROP_HARVESTER_INTERVAL = "harvester_interval"
+
 _logger = logging.getLogger(__name__)
+
+
+def get_config():
+    config_location = os.environ.get("AIRFLOW_HOME", "/opt/airflow") + "/airflow.cfg"
+
+    nr_config = {}
+    nr_dimensions = {}
+    try:
+        with open(config_location, mode="r") as file:
+            airflow_config = file.read()
+
+        airflow_config = AirflowConfigParser(
+            default_config=airflow_config.encode("UTF-8").decode()
+        )
+        section = airflow_config.getsection("newrelic")
+        if section is not None:
+            nr_config = section
+
+        section = airflow_config.getsection("newrelic.dimensions")
+        if section is not None:
+            nr_dimensions = section
+
+    except Exception:
+        _logger.warning(
+            "Could not find airflow config at %s, using default from environment",
+            config_location,
+        )
+
+    # Set default configs
+    if PROP_INSERT_KEY not in nr_config and ENV_INSERT_KEY in os.environ:
+        nr_config[PROP_INSERT_KEY] = os.environ.get(ENV_INSERT_KEY)
+
+    if PROP_SERVICE_NAME not in nr_config:
+        nr_config[PROP_SERVICE_NAME] = os.environ.get(ENV_SERVICE_NAME, "Airflow")
+
+    if PROP_HOST not in nr_config:
+        nr_config[PROP_HOST] = os.environ.get(ENV_HOST, None)
+
+    if PROP_HARVESTER_INTERVAL not in nr_config:
+        nr_config[PROP_HARVESTER_INTERVAL] = 5
+
+    nr_dimensions["service.name"] = nr_config[PROP_SERVICE_NAME]
+
+    return nr_config, nr_dimensions
+
+
+config, dimensions = get_config()
 
 
 class Harvester(_Harvester):
@@ -57,15 +114,14 @@ class NewRelicStatsLogger(object):
             if harvester:
                 return harvester
 
-            insert_key = os.environ["NEW_RELIC_INSERT_KEY"]
-            host = os.environ.get("NEW_RELIC_HOST", None)
-            client = MetricClient(insert_key, host=host)
+            client = MetricClient(config[PROP_INSERT_KEY], host=config[PROP_HOST])
 
-            service_name = os.environ.get("NEW_RELIC_SERVICE_NAME", "Airflow")
-            batch = MetricBatch({"service.name": service_name})
+            batch = MetricBatch(dimensions)
             _logger.info("PID: %d -- Using New Relic Stats Recorder", pid)
 
-            harvester = cls._harvesters[pid] = Harvester(client, batch)
+            harvester = cls._harvesters[pid] = Harvester(
+                client, batch, harvest_interval=config[PROP_HARVESTER_INTERVAL]
+            )
             harvester.start()
 
             atexit.register(harvester.stop)
@@ -121,7 +177,7 @@ class NewRelicStatsPlugin(AirflowPlugin):
             except ImportError:
                 pass
 
-        if "NEW_RELIC_INSERT_KEY" in os.environ and not cls.patched:
+        if PROP_INSERT_KEY in config and not cls.patched:
             cls.patched = True
             _logger.info("Using NewRelicStatsLogger")
 
