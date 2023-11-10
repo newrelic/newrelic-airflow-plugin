@@ -110,7 +110,7 @@ class NewRelicStatsPlugin(AirflowPlugin):
 
     @classmethod
     def get_stats_logger(cls):
-        """Import StatsLogger and Stats classes."""
+        """Handle importing of StatsLogger and Stats classes."""
         StatsLogger = Stats = None
 
         stats_logger_modules = ["airflow.stats", "airflow.settings"]
