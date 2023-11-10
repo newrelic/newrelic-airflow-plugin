@@ -14,8 +14,10 @@
 
 import datetime
 import os
+from unittest.mock import patch
 
 import pytest
+from newrelic_airflow_plugin.newrelic_plugin import NewRelicStatsPlugin
 from newrelic_telemetry_sdk.client import HTTPResponse, MetricClient
 
 
@@ -94,3 +96,39 @@ def test_timing_datetime(stats):
 
 def test_timing_float(stats):
     stats.timing("test_timer", 0.7)
+
+
+def test_get_stats_logger_success():
+    def mock_import_module(module_name):
+        if module_name == "airflow.stats":
+
+            class MockStatsModule:
+                class NoStatsLogger:
+                    pass
+
+                class DummyStatsLogger:
+                    pass
+
+                class Stats:
+                    pass
+
+            return MockStatsModule
+        else:
+            raise ModuleNotFoundError
+
+    with patch("newrelic_airflow_plugin.newrelic_plugin.import_module", mock_import_module):
+        StatsLogger, Stats = NewRelicStatsPlugin.get_stats_logger()
+
+        assert StatsLogger.__name__ == "NoStatsLogger"
+        assert Stats.__name__ == "Stats"
+
+
+def test_get_stats_logger_failure(monkeypatch):
+    def mock_import_module(name):
+        raise ModuleNotFoundError
+
+    with patch("newrelic_airflow_plugin.newrelic_plugin.import_module", mock_import_module):
+        StatsLogger, Stats = NewRelicStatsPlugin.get_stats_logger()
+
+        assert StatsLogger is None
+        assert Stats is None

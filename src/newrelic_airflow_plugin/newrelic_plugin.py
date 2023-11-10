@@ -16,6 +16,7 @@ import atexit
 import logging
 import os
 import threading
+from importlib import import_module
 
 from airflow.plugins_manager import AirflowPlugin
 from newrelic_telemetry_sdk import Harvester as _Harvester
@@ -108,32 +109,41 @@ class NewRelicStatsPlugin(AirflowPlugin):
     patched_attrs = ("incr", "gauge", "timing")
 
     @classmethod
+    def get_stats_logger(cls):
+        """Import StatsLogger and Stats classes."""
+        StatsLogger = Stats = None
+
+        stats_logger_modules = ["airflow.stats", "airflow.settings"]
+        for module_name in stats_logger_modules:
+            try:
+                StatsLogger = getattr(
+                    import_module(module_name), "NoStatsLogger", None
+                ) or getattr(import_module(module_name), "DummyStatsLogger")
+
+                Stats = getattr(import_module(module_name), "Stats")
+                break
+            except (AttributeError, ImportError, ModuleNotFoundError):
+                pass
+
+        return StatsLogger, Stats
+
+    @classmethod
     def validate(cls):
         result = super(NewRelicStatsPlugin, cls).validate()
 
-        DummyStatsLogger = Stats = None
-
-        try:
-            from airflow.stats import DummyStatsLogger, Stats
-        except ImportError:
-            try:
-                from airflow.settings import DummyStatsLogger, Stats
-            except ImportError:
-                pass
+        StatsLogger, Stats = cls.get_stats_logger()
 
         if "NEW_RELIC_INSERT_KEY" in os.environ and not cls.patched:
             cls.patched = True
             _logger.info("Using NewRelicStatsLogger")
 
             # Patch class
-            if Stats is DummyStatsLogger:
+            if Stats is StatsLogger:
                 for attr in cls.patched_attrs:
                     setattr(Stats, attr, getattr(NewRelicStatsLogger, attr))
 
             # Patch instance
-            if hasattr(Stats, "instance") and isinstance(
-                Stats.instance, DummyStatsLogger
-            ):
+            if hasattr(Stats, "instance") and isinstance(Stats.instance, StatsLogger):
                 for attr in cls.patched_attrs:
                     setattr(Stats.instance, attr, getattr(NewRelicStatsLogger, attr))
 
