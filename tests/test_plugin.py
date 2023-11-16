@@ -76,21 +76,21 @@ def test_on_dagrun_failure(stats, capture_sent):
 
 
 def test_incr(stats):
-    stats.incr("test_metric")
+    stats.incr("test_metric", tags={})
 
 
 def test_decr(stats):
-    stats.decr("test_metric")
+    stats.decr("test_metric", tags={})
 
 
 def test_gauge(stats):
-    stats.gauge("test_metric", 100)
+    stats.gauge("test_metric", 100, tags={})
 
 
 def test_timing_datetime(stats):
     dt = datetime.timedelta(microseconds=1000)
-    stats.timing("test_timer", dt)
+    stats.timing("test_timer", dt, tags={})
 
 
 def test_timing_float(stats):
-    stats.timing("test_timer", 0.7)
+    stats.timing("test_timer", 0.7, tags={})
