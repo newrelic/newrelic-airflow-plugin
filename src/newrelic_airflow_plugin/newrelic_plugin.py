@@ -108,32 +108,47 @@ class NewRelicStatsPlugin(AirflowPlugin):
     patched_attrs = ("incr", "gauge", "timing")
 
     @classmethod
-    def validate(cls):
-        result = super(NewRelicStatsPlugin, cls).validate()
-
-        DummyStatsLogger = Stats = None
+    def get_stats_logger(cls):
+        """Handle importing of StatsLogger and Stats classes."""
+        StatsLogger = Stats = None
 
         try:
             from airflow.stats import DummyStatsLogger, Stats
+            return DummyStatsLogger, Stats
         except ImportError:
-            try:
-                from airflow.settings import DummyStatsLogger, Stats
-            except ImportError:
-                pass
+            pass
+
+        try:
+            from airflow.stats import NoStatsLogger, Stats
+            return NoStatsLogger, Stats
+        except ImportError:
+            pass
+
+        try:
+            from airflow.settings import DummyStatsLogger, Stats
+            return DummyStatsLogger, Stats
+        except ImportError:
+            pass
+
+        return StatsLogger, Stats
+
+    @classmethod
+    def validate(cls):
+        result = super(NewRelicStatsPlugin, cls).validate()
+
+        StatsLogger, Stats = cls.get_stats_logger()
 
         if "NEW_RELIC_INSERT_KEY" in os.environ and not cls.patched:
             cls.patched = True
             _logger.info("Using NewRelicStatsLogger")
 
             # Patch class
-            if Stats is DummyStatsLogger:
+            if Stats is StatsLogger:
                 for attr in cls.patched_attrs:
                     setattr(Stats, attr, getattr(NewRelicStatsLogger, attr))
 
             # Patch instance
-            if hasattr(Stats, "instance") and isinstance(
-                Stats.instance, DummyStatsLogger
-            ):
+            if hasattr(Stats, "instance") and isinstance(Stats.instance, StatsLogger):
                 for attr in cls.patched_attrs:
                     setattr(Stats.instance, attr, getattr(NewRelicStatsLogger, attr))
 
