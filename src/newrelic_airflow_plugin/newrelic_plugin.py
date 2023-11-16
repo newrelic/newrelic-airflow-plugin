@@ -73,23 +73,23 @@ class NewRelicStatsLogger(object):
             return harvester
 
     @classmethod
-    def incr(cls, stat, count=1, rate=1):
+    def incr(cls, stat, count=1, rate=1, **kwargs):
         harvester = cls.harvester()
         harvester.batch.record_count(stat, count)
         harvester.send_for_metric(stat)
 
     @classmethod
-    def decr(cls, stat, count=1, rate=1):
+    def decr(cls, stat, count=1, rate=1, **kwargs):
         raise NotImplementedError
 
     @classmethod
-    def gauge(cls, stat, value, rate=1, delta=False):
+    def gauge(cls, stat, value, rate=1, delta=False, **kwargs):
         harvester = cls.harvester()
         harvester.batch.record_gauge(stat, value)
         harvester.send_for_metric(stat)
 
     @classmethod
-    def timing(cls, stat, dt):
+    def timing(cls, stat, dt, **kwargs):
         value = None
         tags = None
         try:
