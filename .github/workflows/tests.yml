@@ -102,6 +102,10 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
+      - name: Install Dependencies
+        run: |
+          pip install tox
+
       - name: Test
         run: |
           tox -vv
