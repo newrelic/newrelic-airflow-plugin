@@ -35,7 +35,40 @@ via pip:
 
 
 Configuration
-+++++++++++++
+----------------
+
+The integration can either be configured via configuration file (`airflow.cfg`) or via environment variables.
+
+Via configuration file
+++++++++++++++++++++++++
+
+Per default the integration will look for a configuration file called ``airflow.cfg`` in the ``/opt/airflow`` directory. 
+
+The directory can be changed via the ``AIRFLOW_HOME`` environment variable.
+
+Following properties are supported:
+
+..  code-block:: bash
+
+    [newrelic]
+    insert_key = abc-your-ingest-key-here   # Insert API Key
+    host = metric-api.eu.newrelic.com       # Datacenter host (defaults to US region)
+    service_name = local-airflow-docker     # Custom service name, under which the data will be reported (defaults to Airflow)
+    harvester_interval = 10                 # Harvester interval (defaults to 5)
+
+    # Additional dimensions to pass
+    [newrelic.dimensions]
+    foo = bar
+    new = relic
+    some = thing
+
+
+
+Additional dimensions can only be added in the configuration file in the ``[newrelic.dimensions]`` section.
+
+
+Via Environment
+++++++++++++++++++++++++
 
 Set the ``NEW_RELIC_INSERT_KEY`` environment variable to a valid
 `New Relic insert key <https://docs.newrelic.com/docs/apis/get-started/intro-apis/types-new-relic-api-keys#event-insert-key>`_
